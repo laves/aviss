@@ -1,0 +1,34 @@
+Processing libraries:
+	Processing 
+		- core.jar 
+		- gluegen-rt*.jar 
+		- jogl-all*.jar
+	PeasyCam
+		- peasycam.jar
+	G4P
+		- G4P.jar
+	Minim
+		- minim.jar
+		- jl1.0.jar
+		- jsminim.jar
+		- mp3spi1.9.4.jar
+		- tritonus_aos.jar
+		- tritonus_share.jar
+	Hemesh
+		- hemesh.jar || il_hemesh.jar
+		- javolution-6.1.0.jar
+		- jts.jar
+		- log4j-1.2.17.jar
+		- trove-3.1a1.jar
+
+Generic Libraries:
+	Apache Collections 
+		- commons-collections4-4.0.jar
+	Swing? 
+		- forms-1.3.0.jar
+		- ???miglayout15-swing.jar???
+	Opal
+		- opal-1.0.1.jar
+	SWT
+		- swt.jar (**********NEEED WIN VERSION***********)
+		- SWTResourceManager.java
