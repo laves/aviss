@@ -1,7 +1,7 @@
 #define PRESSURE_BOUNDARY
 #define VELOCITY_BOUNDARY
 
-uniform vec2 invresolution;
+uniform vec3 invresolution;
 uniform float aspectRatio;
 
 vec2 clipToSimSpace(vec2 clipSpace){

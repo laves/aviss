@@ -8,4 +8,5 @@ public enum AVGeneratorType {
 	Kinect_Point_Cloud,
 	Kinect_Star_Cloud,
 	Image_Overlay,
+	Kinect_Fluid
 }

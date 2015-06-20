@@ -1,33 +1,39 @@
 package aviss.data;
 
-import aviss.applet.AppletManager;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+
+import aviss.applet.PManager;
 import processing.core.*;
+import processing.opengl.PGL;
+import processing.opengl.PJOGL;
 import processing.opengl.PShader;
 
 public class GPUParticles {
 
-	public PGraphics particleData;
-	public float[] particleUVs;
+	public PRenderTarget2Phase particleData;
+	public FloatBuffer particleUVs;
+	public IntBuffer particleBufferID;
 	
 	public PShader initialConditionsShader;
 	public PShader stepParticlesShader;
 	
-	public float dragCoefficient;
-	public PVector flowScale;
-	public PImage flowVelocityField;
+	private PApplet pApp;
 	
-	public GPUParticles(int count)
+	public GPUParticles(int count, PApplet applet)
 	{	
-		String vertShader = getClass().getResource("gpufluid/shaders/glsl/fluid/initialConditions.vert.glsl").getPath();
-		String fragShader = getClass().getResource("gpufluid/shaders/glsl/fluid/initialConditions.frag.glsl").getPath();
-		initialConditionsShader = AppletManager.getApplet().loadShader(fragShader, vertShader);
-		vertShader = getClass().getResource("gpufluid/shaders/glsl/fluid/texel-space.vert.glsl").getPath();
-		fragShader = getClass().getResource("gpufluid/shaders/glsl/fluid/advect.frag.glsl").getPath();
-		stepParticlesShader = AppletManager.getApplet().loadShader(fragShader, vertShader);
+		pApp = applet;
+		
+		String vertShader = getClass().getResource("/aviss/shaders/gpuparticles/initialConditions.vert.glsl").getPath();
+		String fragShader = getClass().getResource("/aviss/shaders/gpuparticles/initialConditions.frag.glsl").getPath();
+		initialConditionsShader = PManager.getApplet().loadShader(fragShader, vertShader);
+		vertShader = getClass().getResource("/aviss/shaders/gpuparticles/stepParticles.vert.glsl").getPath();
+		fragShader = getClass().getResource("/aviss/shaders/gpuparticles/stepParticles.frag.glsl").getPath();
+		stepParticlesShader = PManager.getApplet().loadShader(fragShader, vertShader); 
 		
 		//set params
-		this.dragCoefficient = 1;
-		this.flowScale = new PVector(1, 1);
+		setDragCoefficient(1);
+		setFlowScale(new PVector(1, 1));
 
 		//trigger creation of particle textures
 		setCount(count);
@@ -39,7 +45,7 @@ public class GPUParticles {
 	public void step(float dt)
 	{
 		stepParticlesShader.set("dt", dt);
-		stepParticlesShader.set("particleData", particleData);
+		stepParticlesShader.set("particleData", particleData.readFrom.get());
 		renderShaderTo(stepParticlesShader, particleData);		
 	}
 	
@@ -52,58 +58,62 @@ public class GPUParticles {
 		int dataWidth = (int)Math.ceil( Math.sqrt(newCount) );
 		int dataHeight = dataWidth;
 
-		PApplet pApp = AppletManager.getApplet();
 		//create particle data texture
 		if(particleData != null)
 			particleData.resize(dataWidth, dataHeight);
 		else
-			particleData = pApp.createGraphics(pApp.width, pApp.height, PApplet.OPENGL);
+			particleData = new PRenderTarget2Phase(dataWidth, dataHeight);
 
 		//create particle vertex buffers that direct vertex shaders to particles to texel coordinates
-		particleUVs = new float[dataWidth * dataHeight * 2];
+		float[] particleArray = new float[dataWidth * dataHeight * 2];
 		int idx = 0;
 		for(int i = 0; i < dataWidth; i++){
 			for(int j = 0; j < dataHeight; j++){
-				particleUVs[idx++] = i/dataWidth; 
-				particleUVs[idx++] = j/dataHeight;
+				particleArray[idx++] = ((float)i/(float)dataWidth); 
+				particleArray[idx++] = ((float)j/(float)dataHeight);
 			}
 		}
-
+		particleUVs = Utils.allocateDirectFloatBuffer(particleArray.length);
+		particleUVs.put(particleArray);
+		particleUVs.rewind();
+				
+		PJOGL pgl = PManager.getPGL();
+		particleBufferID = Utils.allocateDirectIntBuffer(1);
+		pgl.genBuffers(1, particleBufferID);
+		pgl.bindBuffer(PGL.ARRAY_BUFFER, particleBufferID.get(0));
+		pgl.bufferData(PGL.ARRAY_BUFFER, particleArray.length, particleUVs, PGL.STATIC_DRAW);
+		PManager.endPGL();
+		
 		return newCount;
 	}
 
-	private void renderShaderTo(PShader shader, PGraphics target){
+	private void renderShaderTo(PShader shader, PRenderTarget2Phase target)
+	{	
+		target.writeTo.beginDraw();
+		target.writeTo.shader(shader);
+		target.writeTo.noStroke();
 		
-		PApplet pApp = AppletManager.getApplet();
+		target.writeTo.beginShape(PApplet.TRIANGLE_STRIP);
+		target.writeTo.vertex(0, pApp.height, 0, 1);
+		target.writeTo.vertex(0, 0, 0, 0);
+		target.writeTo.vertex(pApp.width, pApp.height, 1, 1);
+		target.writeTo.vertex(pApp.width, 0, 1, 0);
+		target.writeTo.endShape();
+		target.writeTo.endDraw();
 		
-		target.shader(shader);
-		target.noStroke();
-		
-		target.beginShape(PApplet.TRIANGLE_STRIP);
-		target.vertex(0, pApp.height, 0, 1);
-		target.vertex(0, 0, 0, 0);
-		target.vertex(pApp.width, pApp.height, 1, 1);
-		target.vertex(pApp.width, 0, 1, 0);
-		target.endShape();
-		
-		pApp.image(target, 0, 0);
+		target.swap();
 	}
-
-	private float get_dragCoefficient()   	{ return dragCoefficient; }
-	private PVector get_flowScale()        	{ return flowScale; }
-	private PImage get_flowVelocityField()	{ return flowVelocityField; }
-
-	private void set_dragCoefficient(float v) {
-		dragCoefficient = v;
+	
+	public void setDragCoefficient(float v) {
 		stepParticlesShader.set("dragCoefficient", v);
 	}
-	private void set_flowScale(PVector v){
-		flowScale = v;
+	
+	public void setFlowScale(PVector v){
 		stepParticlesShader.set("flowScale", v);
 	}
-	private void set_flowVelocityField(PImage v){  
-		flowVelocityField = v;
-		stepParticlesShader.set("flowVelocityField", v);
+	
+	public void setFlowVelocityField(IntBuffer v){  
+		stepParticlesShader.set("flowVelocityField", v.get(0));
 	}
 }
 

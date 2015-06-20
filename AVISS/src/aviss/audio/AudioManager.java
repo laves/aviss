@@ -26,7 +26,6 @@ public class AudioManager implements Runnable
 	public int fftNumOctaveBands = 10;
 	public boolean hasValues;
 	
-	
 	private Minim minim;
 	private AudioPlayer player;
 	private AudioInput in;

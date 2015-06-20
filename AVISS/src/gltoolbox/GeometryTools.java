@@ -1,21 +1,18 @@
 package gltoolbox;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.FloatBuffer;
-import java.nio.IntBuffer;
-import java.util.ArrayList;
+import java.nio.*;
 import java.util.HashMap;
 
-import aviss.applet.AppletManager;
+import aviss.applet.PManager;
+import aviss.data.Utils;
 import processing.core.*;
 import processing.opengl.*;
 
 public class GeometryTools {
 	
-	static HashMap<Integer, PShape> unitQuadCache = new HashMap<Integer, PShape>();
-	static public PShape getCachedUnitQuad(int drawMode){
-		PShape unitQuad = unitQuadCache.get(drawMode);
+	static HashMap<Integer, IntBuffer> unitQuadCache = new HashMap<Integer, IntBuffer>();
+	static public IntBuffer getCachedUnitQuad(int drawMode){
+		IntBuffer unitQuad = unitQuadCache.get(drawMode);
 		if(unitQuad == null)
 		{
             unitQuad = createUnitQuad(drawMode);
@@ -26,9 +23,9 @@ public class GeometryTools {
 	}
 	
 
-    static HashMap<Integer, PShape> clipSpaceQuadCache = new HashMap<Integer, PShape>();
-    static public PShape getCachedClipSpaceQuad(int drawMode){
-        PShape clipSpaceQuad = clipSpaceQuadCache.get(drawMode);
+    static HashMap<Integer, IntBuffer> clipSpaceQuadCache = new HashMap<Integer, IntBuffer>();
+    static public IntBuffer getCachedClipSpaceQuad(int drawMode){
+    	IntBuffer clipSpaceQuad = clipSpaceQuadCache.get(drawMode);
         if(clipSpaceQuad == null){
             clipSpaceQuad = createClipSpaceQuad(drawMode);
             clipSpaceQuadCache.put(drawMode, clipSpaceQuad);
@@ -36,64 +33,64 @@ public class GeometryTools {
         return clipSpaceQuad;
     }
 
-    static public PShape createUnitQuad(int drawMode){
-        return createQuad(0, 0, 1, 1, drawMode, PGL.STATIC_DRAW);
+    static public IntBuffer createUnitQuad(int drawMode){
+        return createQuad(0, 0, 1, 1, drawMode);
     }
 
-    static public PShape createClipSpaceQuad(int drawMode){
-        return createQuad(-1, -1, 2, 2, drawMode, PGL.STATIC_DRAW);
+    static public IntBuffer createClipSpaceQuad(int drawMode){
+        return createQuad(-1, -1, 2, 2, drawMode);
     }
 
-    static public PShape createQuad(float originX, float originY, float width, float height, int drawMode, int usage)
+    static public IntBuffer createQuad(float originX, float originY, float width, float height, int drawMode)
     {
-        PShape sh = AppletManager.getApplet().createShape();
-    	sh.beginShape(drawMode);
-        if(drawMode == PApplet.TRIANGLE_STRIP)
+    	IntBuffer sh = IntBuffer.allocate(1);
+    	
+    	float[] vertices;
+        if(drawMode == PGL.TRIANGLES)
         {
-    	    sh.vertex(originX, originY+height, 0, 1); //anti-clockwise triangle strip
-    	    sh.vertex(originX, originY,);    									
-    	    sh.vertex(originX+width,  originY+height);
-    	    sh.vertex(originX+width,  originY);
-    	//  0---2
-    	//  |  /|
-        //  | / |
-        //  1---3
-                //TRIANGLE_STRIP builds triangles with the pattern, v0, v1, v2 | v2, v1, v3
-                //by default, anti-clockwise triangles are front-facing 
-    	    
+        	vertices = new float[]{ originX, originY+height, 
+									originX, originY,    									
+									originX+width,  originY+height,
+									originX+width,  originY,
+									originX+width,  originY+height, //  *---4
+									originX,        originY 		//  |  /|
+        					        };								//  | / |
+                    												//  5---*                   
         }
-        else if(drawMode == PApplet.TRIANGLES)
+        else if (drawMode == PGL.TRIANGLE_FAN)
         {
-        	sh.vertex(originX,        originY+height);     //  0---2
-        	sh.vertex(originX,        originY);            //  |  /|
-        	sh.vertex(originX+width,  originY+height);     //  | / |
-        	sh.vertex(originX+width,  originY);            //  1---3
-        	sh.vertex(originX+width,  originY+height); 	//  *---4
-        	sh.vertex(originX,        originY); 		//  |  /|
-                    									//  | / |
-                    									//  5---*                   
+        	vertices = new float[]{	originX, originY+height,
+        							originX, originY,
+        							originX+width,  originY,
+        							originX+width,  originY+height,        			
+        							};
         }
-        else if (drawMode == PApplet.TRIANGLE_FAN)
-        {
-        	sh.vertex(originX,        originY+height);    //  0---3
-        	sh.vertex(originX,        originY);           //  |\  |
-        	sh.vertex(originX+width,  originY);           //  | \ |
-        	sh.vertex(originX+width,  originY+height);    //  1---2
+        else { // PGL TRIANGLE_STRIP
+			vertices = new float[]{ originX, originY+height, 
+	    							originX, originY,    									
+	    							originX+width,  originY+height,
+	    							originX+width,  originY 
+	    							};
+		//  0---2
+		//  |  /|
+	    //  | / |
+	    //  1---3
+	            //TRIANGLE_STRIP builds triangles with the pattern, v0, v1, v2 | v2, v1, v3
+	            //by default, anti-clockwise triangles are front-facing         	 
         }
-        sh.endShape();
-	    
-//	    FloatBuffer quad = ByteBuffer.allocateDirect(vertices.length * (Float.SIZE / 8)).order(ByteOrder.nativeOrder()).asFloatBuffer();    
-//		quad.put(vertices);
-//		quad.rewind();
-//		IntBuffer quadID = ByteBuffer.allocateDirect(Integer.SIZE/8).order(ByteOrder.nativeOrder()).asIntBuffer();
-//		
-//		PGL pgl = AppletManager.startPGL();
-//		pgl.genBuffers(1, quadID);
-//		pgl.bindBuffer(PGL.ARRAY_BUFFER, quadID.get(0));
-//		pgl.bufferData(PGL.ARRAY_BUFFER, vertices.length * 3 * (Float.SIZE/8), quad, usage);
-//		pgl.bindBuffer(PGL.ARRAY_BUFFER, 0);
-//		AppletManager.endPGL();
-//		
+        
+	    FloatBuffer quad = FloatBuffer.allocate(vertices.length);    
+		quad.put(vertices);
+		quad.rewind();
+		
+		PGL pgl = PManager.getPGL();
+		pgl.genBuffers(1, sh);
+		pgl.bindBuffer(PGL.ARRAY_BUFFER, sh.get(0));
+		pgl.bufferData(PGL.ARRAY_BUFFER, vertices.length, quad, PGL.STATIC_DRAW);
+		pgl.bindBuffer(PGL.ARRAY_BUFFER, 0);
+		PManager.endPGL();
+		pgl = null;
+		
         return sh;
     }
 }

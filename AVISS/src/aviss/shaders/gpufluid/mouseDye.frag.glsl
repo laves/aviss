@@ -1,7 +1,7 @@
-uniform sampler2D velocity;
+uniform sampler2D dye;
 uniform float dt;
 uniform float dx;
-	
+
 uniform vec3 invresolution;
 uniform float aspectRatio;
 
@@ -12,7 +12,8 @@ uniform vec3 lastMouseClipSpace;
 varying vec2 texelCoord;
 varying vec2 p;
 
-//Segment
+	
+	//Segment
 float distanceToSegment(vec2 a, vec2 b, vec2 p, out float fp){
 	vec2 d = p - a;
 	vec2 x = b - a;
@@ -36,28 +37,29 @@ vec2 clipToSimSpace(vec2 clipSpace){
 }
 
 void main(){
-	vec2 v = texture2D(velocity, texelCoord).xy;
-
-	v.xy *= 0.999;
-
-	if(isMouseDown){
+	vec4 color = texture2D(dye, texelCoord);
+	color.r *= (0.9797);
+	color.g *= (0.9494);
+	color.b *= (0.9696);
+	if(isMouseDown){			
 		vec2 mouse = clipToSimSpace(mouseClipSpace.xy);
 		vec2 lastMouse = clipToSimSpace(lastMouseClipSpace.xy);
 		vec2 mouseVelocity = -(lastMouse - mouse)/dt;
-			
+		
 		//compute tapered distance to mouse line segment
-		float fp; //fractional projection
+		float fp;//fractional projection
 		float l = distanceToSegment(mouse, lastMouse, p, fp);
-		float taperFactor = 0.6;//1 => 0 at lastMouse, 0 => no tapering
+		float taperFactor = 0.6;
 		float projectedFraction = 1.0 - clamp(fp, 0.0, 1.0)*taperFactor;
-
-		float R = 0.015;
-		float m = exp(-l/R); //drag coefficient
-		m *= projectedFraction * projectedFraction;
-
-		vec2 targetVelocity = mouseVelocity*dx;
-		v += (targetVelocity - v)*m;
+		float R = 0.025;
+		float m = exp(-l/R);
+		
+		float speed = length(mouseVelocity);
+		float x = clamp((speed * speed * 0.02 - l * 5.0) * projectedFraction, 0., 1.);
+		color.rgb += m * (
+			mix(vec3(2.4, 0, 5.9) / 60.0, vec3(0.2, 51.8, 100) / 30.0, x)
+			+ (vec3(100) / 100.) * pow(x, 9.)
+		);
 	}
-
-	gl_FragColor = vec4(v, 0, 1.);
+	gl_FragColor = color;
 }

@@ -37,9 +37,7 @@ vec2 clipToSimSpace(vec2 clipSpace){
 
 void main(){
 	vec2 v = texture2D(velocity, texelCoord).xy;
-
 	v.xy *= 0.999;
-
 	if(isMouseDown){
 		vec2 mouse = clipToSimSpace(mouseClipSpace.xy);
 		vec2 lastMouse = clipToSimSpace(lastMouseClipSpace.xy);
@@ -50,14 +48,11 @@ void main(){
 		float l = distanceToSegment(mouse, lastMouse, p, fp);
 		float taperFactor = 0.6;//1 => 0 at lastMouse, 0 => no tapering
 		float projectedFraction = 1.0 - clamp(fp, 0.0, 1.0)*taperFactor;
-
 		float R = 0.015;
 		float m = exp(-l/R); //drag coefficient
 		m *= projectedFraction * projectedFraction;
-
 		vec2 targetVelocity = mouseVelocity*dx;
 		v += (targetVelocity - v)*m;
 	}
-
 	gl_FragColor = vec4(v, 0, 1.);
 }

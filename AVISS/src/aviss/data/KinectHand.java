@@ -24,7 +24,7 @@ public class KinectHand {
 	public PVector attract(Star s){
 		
 		PVector force = new PVector(0, 0, 0);
-		if(rightHandState.equals(KinectPV2.HandState_Closed))
+		if(rightHandState.equals(KinectPV2.HandState_Closed) || rightHandState.equals(KinectPV2.HandState_Open))
     	{
 			PVector tmpF = PVector.sub(rightHandLocation, s.location); // Calculate direction of force
 		    float d = tmpF.mag();                               // Distance between objects
@@ -33,7 +33,7 @@ public class KinectHand {
 		    tmpF.setMag(strength);   // Get force vector --> magnitude * direction
 		    force.add(tmpF);
     	}
-		if(leftHandState.equals(KinectPV2.HandState_Closed))
+		if(leftHandState.equals(KinectPV2.HandState_Closed) || leftHandState.equals(KinectPV2.HandState_Open))
     	{
 			PVector tmpF = PVector.sub(leftHandLocation, s.location); // Calculate direction of force
 		    float d = tmpF.mag();                               // Distance between objects

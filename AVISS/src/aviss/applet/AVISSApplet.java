@@ -40,37 +40,32 @@ public class AVISSApplet extends PApplet {
 	}
 	
 	public void setup() {
-		size(displayWidth, displayHeight, OPENGL);				
-		smooth(8);
+		size(displayWidth, displayHeight,OPENGL);				
+		//smooth(8);
 		noCursor();
-		
-		String[] settingsIcon = new String[]{				
-				getClass().getResource("/aviss/resources/settings_24.png").getPath()
-		};
-		settingsButton= new GImageButton(this, width-35, height-35, settingsIcon);
+//		
+//		String[] settingsIcon = new String[]{				
+//				getClass().getResource("/aviss/resources/settings_24.png").getPath()
+//		};
+//		settingsButton= new GImageButton(this, width-35, height-35, settingsIcon);
 		genLock = new ReentrantLock();
 		
 //		cam = new PeasyCam(this, 1500);
 //		cam.setMinimumDistance(0);
 //		cam.setMaximumDistance(2000);
-		osc = new OscP5(this,12000);
-		address = new NetAddress("142.103.165.226", 12000);
+//		osc = new OscP5(this,12000);
+//		address = new NetAddress("142.103.165.226", 12000);
 		
-		AppletManager.setApplet(this);
+		PManager.setApplet(this);
 		audioManager = new AudioManager(this, 40);//, "D:/XPS/Kendrick Lamar - To Pimp a Butterfly (2015) [MP3 320 KBPS]~{VBUc}/15 i.mp3", 1024, true);
 		new Thread(audioManager).start();
 		
 		avGenMap = new HashMap<String, AVGenerator>();		
 		//addAVGenerator(AVGeneratorType.Kinect_Star_Cloud);
-		//addAVGenerator(AVGeneratorType.Image_Overlay);
-		AVGenerator ksc = createKinectStarCloud();
-		ksc.init(this, audioManager);
-		avGenMap.put("ksc", ksc);
-		AVGenerator io = createImageOverlay();
-		io.init(this, audioManager);
-		avGenMap.put("io", io);
-		
-		
+		addAVGenerator(AVGeneratorType.Kinect_Fluid);
+//		AVGenerator a = new GraphicsExperiments();
+//		a.init(this, audioManager);
+//		avGenMap.put("a", a);
 	}
 
 	public void draw() 
@@ -80,11 +75,10 @@ public class AVISSApplet extends PApplet {
 		if (aquireGeneratorLock()) 
 		{		
 			if (audioManager.hasValues) {
-				avGenMap.get(vKey).run();
-//				for (AVGenerator g : avGenMap.values()) {
-//					if (g != null)
-//						g.run();
-//				}
+				for (AVGenerator g : avGenMap.values()) {
+					if (g != null)
+						g.run();
+				}
 			}
 			new Thread(audioManager).start();
 			genLock.unlock();
@@ -134,6 +128,9 @@ public class AVISSApplet extends PApplet {
 				break;
 			case Image_Overlay:
 				newAVGen = createImageOverlay();
+				break;
+			case Kinect_Fluid:
+				newAVGen = createKinectFluid();
 				break;
 		default:
 			break;
@@ -207,6 +204,10 @@ public class AVISSApplet extends PApplet {
 		return new ImageOverlayGenerator(osc, address);
 	}
 	
+	private KinectFluidGenerator createKinectFluid(){
+		return new KinectFluidGenerator();
+	}
+	
 	public void handleButtonEvents(GImageButton button, GEvent event){
 		if (button == settingsButton && event == GEvent.CLICKED)
 		{	
@@ -214,16 +215,17 @@ public class AVISSApplet extends PApplet {
 		}
 	}
 	
-	public void keyPressed(){
-		if (key == '6') 
-		{
-			vKey = "io";
-		}	
-		else if(key == '1' || key == '2' || key == '3' || key == '4' || key == '5' || key == '7')
-		{
-			vKey = "ksc";
-		}
-		
+	public void keyPressed()
+	{
+//		if (key == '6') 
+//		{
+//			vKey = "io";
+//		}	
+//		else if(key == '1' || key == '2' || key == '3' || key == '4' || key == '5' || key == '7')
+//		{
+//			vKey = "ksc";
+//		}
+//		
 		if (aquireGeneratorLock()) 
 		{		
 			for (AVGenerator g : avGenMap.values()) {
@@ -232,7 +234,6 @@ public class AVISSApplet extends PApplet {
 			}		
 			genLock.unlock();
 		}
-		
 	}
 	
 	public void oscEvent(OscMessage m) 

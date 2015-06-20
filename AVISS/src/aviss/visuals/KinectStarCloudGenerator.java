@@ -6,6 +6,7 @@ import aviss.data.FFTPacket;
 import aviss.data.KinectHand;
 import aviss.data.Star;
 import aviss.data.Star.StarState;
+import aviss.data.Utils;
 import KinectPV2.*;
 
 import java.nio.ByteBuffer;
@@ -75,8 +76,6 @@ public class KinectStarCloudGenerator implements AVGenerator{
 	private float supernovaCoeff = 100;
 	private StarState starState = StarState.No_Move;
 
-	private final int SIZEOF_INT = Integer.SIZE / 8;
-	private final int SIZEOF_FLOAT = Float.SIZE / 8;
 
 	PShader starShader;
 	PShader starTextureShader;
@@ -197,15 +196,15 @@ public class KinectStarCloudGenerator implements AVGenerator{
 			
 			stars.add(newStar);				
 		}
-		kinectPointBuffer = ByteBuffer.allocateDirect(3 * pts.length * SIZEOF_FLOAT).order(ByteOrder.nativeOrder()).asFloatBuffer();
+		kinectPointBuffer = Utils.allocateDirectFloatBuffer(pts.length);
 		kinectPointBuffer.put(pts);
 		kinectPointBuffer.rewind();
 		
-		colourBuffer = ByteBuffer.allocateDirect(4 * colours.length* SIZEOF_FLOAT).order(ByteOrder.nativeOrder()).asFloatBuffer();
+		colourBuffer = Utils.allocateDirectFloatBuffer(colours.length);
 		colourBuffer.put(colours);
 		colourBuffer.rewind();
 		
-		sizeBuffer = ByteBuffer.allocateDirect(sizes.length * SIZEOF_FLOAT).order(ByteOrder.nativeOrder()).asFloatBuffer();
+		sizeBuffer = Utils.allocateDirectFloatBuffer(sizes.length);
 		sizeBuffer.put(sizes);
 		sizeBuffer.rewind();
 		
@@ -216,22 +215,21 @@ public class KinectStarCloudGenerator implements AVGenerator{
 	{		
 		pgl = pApp.beginPGL();
 		
-		vBuffID = allocateDirectIntBuffer(1);
+		vBuffID = Utils.allocateDirectIntBuffer(1);
 		pgl.genBuffers(1, vBuffID);
 		pgl.bindBuffer(PGL.ARRAY_BUFFER, vBuffID.get(0));
-		pgl.bufferData(PGL.ARRAY_BUFFER, nvert * 3 * SIZEOF_FLOAT, kinectPointBuffer, PGL.STATIC_DRAW);
+		pgl.bufferData(PGL.ARRAY_BUFFER, nvert * 3 * Utils.SIZEOF_FLOAT, kinectPointBuffer, PGL.STATIC_DRAW);
 		
-		cBuffID = allocateDirectIntBuffer(1);
+		cBuffID = Utils.allocateDirectIntBuffer(1);
 		pgl.genBuffers(1, cBuffID);
 		pgl.bindBuffer(PGL.ARRAY_BUFFER, cBuffID.get(0));
-		pgl.bufferData(PGL.ARRAY_BUFFER, nvert * 4 * SIZEOF_FLOAT, colourBuffer, PGL.STATIC_DRAW);
+		pgl.bufferData(PGL.ARRAY_BUFFER, nvert * 4 * Utils.SIZEOF_FLOAT, colourBuffer, PGL.STATIC_DRAW);
 		
-		sBuffID = allocateDirectIntBuffer(1);
+		sBuffID = Utils.allocateDirectIntBuffer(1);
 		pgl.genBuffers(1, sBuffID);
 		pgl.bindBuffer(PGL.ARRAY_BUFFER, sBuffID.get(0));
-		pgl.bufferData(PGL.ARRAY_BUFFER, nvert * SIZEOF_FLOAT, sizeBuffer, PGL.STATIC_DRAW);
+		pgl.bufferData(PGL.ARRAY_BUFFER, nvert * Utils.SIZEOF_FLOAT, sizeBuffer, PGL.STATIC_DRAW);
 		
-
 //		texID = IntBuffer.allocate(1);
 //		pgl.genTextures(1, texID);
 //		pgl.bindTexture(PGL.TEXTURE_2D, 1);
@@ -295,26 +293,26 @@ public class KinectStarCloudGenerator implements AVGenerator{
 				{
 					if(handPair.rightHandOSCReset)
 					{	
-						System.out.println("Right OSC Triggered");
-						if(starState.equals(StarState.Spring_React))
-						{
-							OscMessage clinkyTrig = new OscMessage("/startNote");
-							clinkyTrig.add(klangs[new Random().nextInt(klangs.length)]);
-							osc.send(clinkyTrig, kAddress);						
-						}
-						else if(starState.equals(StarState.Gravity))
-						{
-							OscMessage glassTrig = new OscMessage("/startNote2");
-							glassTrig.add(glass[new Random().nextInt(glass.length)]);
-							osc.send(glassTrig, kAddress);						
-						}			
-						handPair.rightHandOSCReset = false;
-						oscEventTimer.schedule(new TimerTask(){
-							  @Override
-							  public void run() {
-								  hands.get(skeletonID).rightHandOSCReset = true;
-							  }
-						}, 500);
+//						System.out.println("Right OSC Triggered");
+//						if(starState.equals(StarState.Spring_React))
+//						{
+//							OscMessage clinkyTrig = new OscMessage("/startNote");
+//							clinkyTrig.add(klangs[new Random().nextInt(klangs.length)]);
+//							osc.send(clinkyTrig, kAddress);						
+//						}
+//						else if(starState.equals(StarState.Gravity))
+//						{
+//							OscMessage glassTrig = new OscMessage("/startNote2");
+//							glassTrig.add(glass[new Random().nextInt(glass.length)]);
+//							osc.send(glassTrig, kAddress);						
+//						}			
+//						handPair.rightHandOSCReset = false;
+//						oscEventTimer.schedule(new TimerTask(){
+//							  @Override
+//							  public void run() {
+//								  hands.get(skeletonID).rightHandOSCReset = true;
+//							  }
+//						}, 500);
 					}
 				}				
 				if(drawSkeleton)
@@ -333,26 +331,26 @@ public class KinectStarCloudGenerator implements AVGenerator{
 				{
 					if(handPair.leftHandOSCReset)
 					{
-						System.out.println("Left OSC Triggered");
-						if(starState.equals(StarState.Spring_React))
-						{
-							OscMessage clinkyTrig = new OscMessage("/startNote");
-							clinkyTrig.add(klangs[new Random().nextInt(klangs.length)]);
-							osc.send(clinkyTrig, kAddress);
-						}
-						else if(starState.equals(StarState.Gravity))
-						{
-							OscMessage glassTrig = new OscMessage("/startNote2");
-							glassTrig.add(glass[new Random().nextInt(glass.length)]);
-							osc.send(glassTrig, kAddress);						
-						}
-						handPair.leftHandOSCReset = false;
-						oscEventTimer.schedule(new TimerTask(){
-							  @Override
-							  public void run() {
-								  hands.get(skeletonID).leftHandOSCReset = true;
-							  }
-						}, 500);
+//						System.out.println("Left OSC Triggered");
+//						if(starState.equals(StarState.Spring_React))
+//						{
+//							OscMessage clinkyTrig = new OscMessage("/startNote");
+//							clinkyTrig.add(klangs[new Random().nextInt(klangs.length)]);
+//							osc.send(clinkyTrig, kAddress);
+//						}
+//						else if(starState.equals(StarState.Gravity))
+//						{
+//							OscMessage glassTrig = new OscMessage("/startNote2");
+//							glassTrig.add(glass[new Random().nextInt(glass.length)]);
+//							osc.send(glassTrig, kAddress);						
+//						}
+//						handPair.leftHandOSCReset = false;
+//						oscEventTimer.schedule(new TimerTask(){
+//							  @Override
+//							  public void run() {
+//								  hands.get(skeletonID).leftHandOSCReset = true;66
+//							  }
+//						}, 500);
 					}
 				}
 				if(drawSkeleton)
@@ -399,7 +397,7 @@ public class KinectStarCloudGenerator implements AVGenerator{
 		  
 		  if(starState.equals(StarState.Supernova)){
 			  if(supernovaCoeff>1.1f)
-				  supernovaCoeff-=0.2f;
+				  supernovaCoeff-=0.4f;
 		  }
 	}
 	
@@ -407,23 +405,23 @@ public class KinectStarCloudGenerator implements AVGenerator{
 	{	
 		  pgl = (PJOGL)pApp.beginPGL();		  
 		  starShader.bind();
-		  
+
 		  int vertexLocation = pgl.getAttribLocation(starShader.glProgram, "vertex");
 		  pgl.enableVertexAttribArray(vertexLocation);
 		  pgl.bindBuffer(PGL.ARRAY_BUFFER, vBuffID.get(0));
-		  pgl.bufferData(PGL.ARRAY_BUFFER,  kinectPointBuffer.capacity() * SIZEOF_FLOAT, kinectPointBuffer, PGL.STATIC_DRAW);
+		  pgl.bufferData(PGL.ARRAY_BUFFER,  kinectPointBuffer.capacity() * Utils.SIZEOF_FLOAT, kinectPointBuffer, PGL.STATIC_DRAW);
 		  pgl.vertexAttribPointer(vertexLocation, 3, PGL.FLOAT, false, 0, 0);
 		  
 		  int colourLocation = pgl.getAttribLocation(starShader.glProgram, "color");
 		  pgl.enableVertexAttribArray(colourLocation);
 		  pgl.bindBuffer(PGL.ARRAY_BUFFER, cBuffID.get(0));
-		  pgl.bufferData(PGL.ARRAY_BUFFER, colourBuffer.capacity() * SIZEOF_FLOAT, colourBuffer, PGL.STATIC_DRAW);
+		  pgl.bufferData(PGL.ARRAY_BUFFER, colourBuffer.capacity() * Utils.SIZEOF_FLOAT, colourBuffer, PGL.STATIC_DRAW);
 		  pgl.vertexAttribPointer(colourLocation, 4, PGL.FLOAT, false, 0, 0);
 		  
 		  int sizeLocation = pgl.getAttribLocation(starShader.glProgram, "size");
 		  pgl.enableVertexAttribArray(sizeLocation);
 		  pgl.bindBuffer(PGL.ARRAY_BUFFER, sBuffID.get(0));
-		  pgl.bufferData(PGL.ARRAY_BUFFER, sizeBuffer.capacity() * SIZEOF_FLOAT, sizeBuffer, PGL.STATIC_DRAW);
+		  pgl.bufferData(PGL.ARRAY_BUFFER, sizeBuffer.capacity() * Utils.SIZEOF_FLOAT, sizeBuffer, PGL.STATIC_DRAW);
 		  pgl.vertexAttribPointer(sizeLocation, 1, PGL.FLOAT, false, 0, 0);
 		  
 		  pgl.enable(PGL.POINT_SMOOTH);
@@ -448,15 +446,15 @@ public class KinectStarCloudGenerator implements AVGenerator{
 		  
 		  pApp.endPGL();			  
 
-////		  FloatBuffer sizes = FloatBuffer.wrap(new float[2]);
-////		  gl2.glGetFloatv(GL2.GL_ALIASED_POINT_SIZE_RANGE, sizes);
-////		  float quadratic[] =  { 1.0f, 0.0f, 0.01f };
-////		  gl2.glPointParameterfv( GL2.GL_POINT_DISTANCE_ATTENUATION, quadratic , 1);
-////		  gl2.glPointParameterf( GL2.GL_POINT_FADE_THRESHOLD_SIZE, 60.0f);
-//		    
-////		  gl2.glPointParameterf(GL2.GL_POINT_SIZE_MIN, sizes.get(0));
-////		  gl2.glPointParameterf(GL2.GL_POINT_SIZE_MAX, sizes.get(1));
-////		  gl2.glTexEnvf(GL2.GL_POINT_SPRITE, GL2.GL_COORD_REPLACE, GL2.GL_TRUE);
+//		  FloatBuffer sizes = FloatBuffer.wrap(new float[2]);
+//		  gl2.glGetFloatv(GL2.GL_ALIASED_POINT_SIZE_RANGE, sizes);
+//		  float quadratic[] =  { 1.0f, 0.0f, 0.01f };
+//		  gl2.glPointParameterfv( GL2.GL_POINT_DISTANCE_ATTENUATION, quadratic , 1);
+//		  gl2.glPointParameterf( GL2.GL_POINT_FADE_THRESHOLD_SIZE, 60.0f);
+		    
+//		  gl2.glPointParameterf(GL2.GL_POINT_SIZE_MIN, sizes.get(0));
+//		  gl2.glPointParameterf(GL2.GL_POINT_SIZE_MAX, sizes.get(1));
+//		  gl2.glTexEnvf(GL2.GL_POINT_SPRITE, GL2.GL_COORD_REPLACE, GL2.GL_TRUE);
 
 	}
 
@@ -508,15 +506,16 @@ public class KinectStarCloudGenerator implements AVGenerator{
 		else if (pApp.key == '1')
 			starState = StarState.No_Move;
 		else if (pApp.key == '2')
-			starState = StarState.Osc;
-		else if (pApp.key == '3')
 			starState = StarState.Spring_React;	
-		else if (pApp.key == '4')
+		else if (pApp.key == '3')
 			starState = StarState.Gravity;	
-		else if (pApp.key == '5')
+		else if (pApp.key == '4')
 			starState = StarState.Point_Cloud;
-		else if (pApp.key == '7')
+		else if (pApp.key == '6')
+		{
 			starState = StarState.Supernova;
+			supernovaCoeff = 100;
+		}
 
 		else if (pApp.key == ' ')
 			ending = true;
@@ -662,15 +661,6 @@ public class KinectStarCloudGenerator implements AVGenerator{
 		    break;
 		  }
 		}
-
-	
-	IntBuffer allocateDirectIntBuffer(int n) {
-		  return ByteBuffer.allocateDirect(n * SIZEOF_INT).order(ByteOrder.nativeOrder()).asIntBuffer();
-	}
-		 
-	FloatBuffer allocateDirectFloatBuffer(int n) {
-		return ByteBuffer.allocateDirect(n * SIZEOF_FLOAT).order(ByteOrder.nativeOrder()).asFloatBuffer();
-	}
 
 	@Override
 	public void oscEvent(OscMessage m) {
