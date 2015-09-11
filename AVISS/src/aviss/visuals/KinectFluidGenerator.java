@@ -28,6 +28,7 @@ public class KinectFluidGenerator implements AVGenerator {
 	private GPUParticles particles;
 	
 	private IntBuffer textureQuad;
+	
 	private PShader screenTextureShader;
 	private PShader renderParticlesShader;
 	private PShader mouseDyeShader;
@@ -37,8 +38,8 @@ public class KinectFluidGenerator implements AVGenerator {
 	// window
 	private boolean mousePointKnown = false;
 	private boolean lastMousePointKnown = false;
-	private PVector mouseClipSpace = new PVector(0, 0);
-	private PVector lastMouseClipSpace = new PVector(0, 0);
+	private PVector mouseFluid = new PVector(0, 0);
+	private PVector lastMouseFluid= new PVector(0, 0);
 	private float time;
 	private float lastTime;
 	
@@ -69,19 +70,12 @@ public class KinectFluidGenerator implements AVGenerator {
 	{
 		pApp = applet;
 		aMan = am;
-
-		textureQuad = GeometryTools.createQuad(0, 0, 1, 1, PGL.TRIANGLE_STRIP);
-//		offScreenTarget = new RenderTarget(
-//						  	Math.round(pApp.width*offScreenScale),
-//						  	Math.round(pApp.height*offScreenScale),
-//						  	new TextureFactory()
-//							);
 		
 		// loading shaders
 		String vertShader = getClass().getResource("/aviss/shaders/gpufluid/no-transform.vert.glsl").getPath();
 		String fragShader = getClass().getResource("/aviss/shaders/gpufluid/quad-texture.frag.glsl").getPath();
 		screenTextureShader = pApp.loadShader(fragShader, vertShader);
-		vertShader = getClass().getResource("/aviss/shaders/gpuparticles/renderParticles.vert.glsl").getPath();
+		vertShader = getClass().getResource("/aviss/shaders/gpuparticles/colourParticleMotion.vert.glsl").getPath();
 		fragShader = getClass().getResource("/aviss/shaders/gpuparticles/renderParticles.frag.glsl").getPath();		
 		renderParticlesShader = pApp.loadShader(fragShader, vertShader);
 		vertShader = getClass().getResource("/aviss/shaders/gpufluid/texel-space.vert.glsl").getPath();		
@@ -90,15 +84,24 @@ public class KinectFluidGenerator implements AVGenerator {
 		fragShader = getClass().getResource("/aviss/shaders/gpufluid/mouseForce.frag.glsl").getPath();
 		mouseForceShader = pApp.loadShader(fragShader, vertShader);
 		
-		mouseDyeShader.set("mouseClipSpace", mouseClipSpace);
-		mouseDyeShader.set("lastMouseClipSpace", lastMouseClipSpace);
+		mouseDyeShader.set("mouse", mouseFluid);
+		mouseDyeShader.set("lastMouse", lastMouseFluid);
+		mouseForceShader.set("mouse", mouseFluid);
+		mouseForceShader.set("lastMouse", lastMouseFluid);
 		mouseDyeShader.set("dye", 1);
-		mouseForceShader.set("mouseClipSpace", mouseClipSpace);
-		mouseForceShader.set("lastMouseClipSpace", lastMouseClipSpace);
 		mouseForceShader.set("velocity", 1);
 		screenTextureShader.set("texture", 1);
+		renderParticlesShader.set("particleData", 1);
 		
 		PJOGL pgl = PManager.getPGL();
+		
+		textureQuad = GeometryTools.createQuad(0, 0, 1, 1, PGL.TRIANGLE_STRIP);
+		offScreenTarget = new RenderTarget(
+						  	pApp.width,
+						  	pApp.height,
+						  	new TextureFactory()
+							);
+		
 		pgl.disable(PGL.DEPTH_TEST);
 		pgl.disable(PGL.CULL_FACE);
 		pgl.disable(PGL.DITHER);
@@ -109,10 +112,10 @@ public class KinectFluidGenerator implements AVGenerator {
 		fluid.setUpdateDyeShader(mouseDyeShader);
 		fluid.setApplyForcesShader(mouseForceShader);
 		
-//		particles = new GPUParticles(particleCount, applet);
+//		particles = new GPUParticles(particleCount);
 //		particles.setFlowScale(fluid.simToClipSpace(new PVector(1,1)));
 //		particles.setDragCoefficient(1f);
-//		
+		
 		lastTime = pApp.millis();
 		PManager.endPGL();
 
@@ -126,24 +129,28 @@ public class KinectFluidGenerator implements AVGenerator {
 	@Override
 	public void run() 
 	{
+//		System.out.println(pApp.frameRate);
+		
 		PJOGL pgl = PManager.getPGL();
 		
 		// *********REPLACE WITH KINECT HANDS UPDATE******
-		mouseClipSpace = windowToClipSpace(new PVector(pApp.mouseX, pApp.mouseY));
+		mouseFluid = fluid.clipToAspectSpace(windowToClipSpace(new PVector(pApp.mouseX, pApp.mouseY)));//windowToClipSpace(new PVector(pApp.mouseX, pApp.mouseY));
 		mousePointKnown = true;
 		//**********************
 		
-		time = pApp.millis();
+		time = (float)pApp.millis()/1000f;
 		float dt = time - lastTime;
 		lastTime = time;
+		
+//		System.out.println(dt);
 		
 		if(lastMousePointKnown && mousePointKnown){
 			mouseDyeShader.set("isMouseDown", pApp.mousePressed);
 			mouseForceShader.set("isMouseDown", pApp.mousePressed);
-			mouseDyeShader.set("mouseClipSpace", mouseClipSpace);
-			mouseDyeShader.set("lastMouseClipSpace", lastMouseClipSpace);
-			mouseForceShader.set("mouseClipSpace", mouseClipSpace);
-			mouseForceShader.set("lastMouseClipSpace", lastMouseClipSpace);
+			mouseDyeShader.set("mouse", mouseFluid);
+			mouseDyeShader.set("lastMouse", lastMouseFluid);
+			mouseForceShader.set("mouse", mouseFluid);
+			mouseForceShader.set("lastMouse", lastMouseFluid);
 		}
 		
 		// step physics
@@ -155,12 +162,12 @@ public class KinectFluidGenerator implements AVGenerator {
 		
 		//render to offScreen
 //		if(OFFSCREEN_RENDER){
-//			pgl.viewport (0, 0, offScreenTarget.width, offScreenTarget.height);
-//			pgl.bindFramebuffer(PGL.FRAMEBUFFER, offScreenTarget.fbo.get(0));
+		pgl.viewport (0, 0, offScreenTarget.width, offScreenTarget.height);
+		pgl.bindFramebuffer(PGL.FRAMEBUFFER, offScreenTarget.fbo.get(0));
 //		}
 //		else{
-		pgl.viewport (0, 0, pApp.width, pApp.height);
-		pgl.bindFramebuffer(PGL.FRAMEBUFFER, 0);
+//		pgl.viewport (0, 0, pApp.width, pApp.height);
+//		pgl.bindFramebuffer(PGL.FRAMEBUFFER, 0);
 //		}
 		
 		pgl.clearColor(0,0,0,1);
@@ -171,18 +178,23 @@ public class KinectFluidGenerator implements AVGenerator {
 		pgl.blendEquation(PGL.FUNC_ADD);
 		
 //		if(renderParticlesEnabled)
-//			renderParticles(pgl);
+//			renderParticles();
 		
 		if(renderFluidEnabled)
-			renderTexture(fluid.dyeRenderTarget.readFromTexture);
-			
+			renderTexture(fluid.velocityRenderTarget.readFromTexture);
 
-		// *********REPLACE WITH KINECT HANDS UPDATE******
-		lastMouseClipSpace = windowToClipSpace(new PVector(pApp.mouseX, pApp.mouseY));
-		lastMousePointKnown = mousePointKnown;
-		//**********************
+		pgl.disable(PGL.BLEND);	
+
+		pgl.viewport (0, 0, pApp.width, pApp.height);
+		pgl.bindFramebuffer(PGL.FRAMEBUFFER, 0);
+		renderTexture(offScreenTarget.texture);
 		
-		pgl.disable(PGL.BLEND);				
+		
+		// *********REPLACE WITH KINECT HANDS UPDATE******
+		lastMouseFluid = mouseFluid;
+		lastMousePointKnown = mousePointKnown;
+		//**********************		
+			
 		PManager.endPGL();
 		pgl = null;
 	}
@@ -210,12 +222,13 @@ public class KinectFluidGenerator implements AVGenerator {
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE1);
 		pgl.bindTexture(PGL.TEXTURE_2D, texture.get(0)); 
+		screenTextureShader.set("texture", 1);	
 //		screenTextureShader.set("texture", texture.get(0));	
 		
 		screenTextureShader.bind();
 		pgl.drawArrays(PGL.TRIANGLE_STRIP, 0, 4);
 		screenTextureShader.unbind();
-		
+		pgl.bindTexture(PGL.TEXTURE_2D, 0);
 		
 		
 		//System.out.println("screenTextureShader");	
@@ -231,17 +244,25 @@ public class KinectFluidGenerator implements AVGenerator {
 
 	}
 	
-	private void renderParticles(PJOGL pgl)
+	private void renderParticles()
 	{
-//		renderParticlesShader.set("particleData", particles.particleData.readFrom.get());		
-//		renderParticlesShader.bind();		
-//		int vertexLocation = pgl.getAttribLocation(renderParticlesShader.glProgram, "vertex");
-//		pgl.enableVertexAttribArray(vertexLocation);
-//		pgl.bindBuffer(PGL.ARRAY_BUFFER, particles.particleBufferID.get(0));
-//		pgl.bufferData(PGL.ARRAY_BUFFER,  particles.particleUVs.capacity(), particles.particleUVs, PGL.STATIC_DRAW);
-//		pgl.vertexAttribPointer(vertexLocation, 2, PGL.FLOAT, false, 0, 0);		
-//		pgl.drawArrays(PGL.POINTS, 0, particles.particleUVs.capacity());
-//		renderParticlesShader.unbind();
+		PJOGL pgl = PManager.getPGL();
+		
+		// loading texture 
+		pgl.enable(PGL.TEXTURE_2D);
+		pgl.activeTexture(PGL.TEXTURE1);
+		pgl.bindTexture(PGL.TEXTURE_2D, particles.particleData.readFromTexture.get(0)); 
+//		renderParticlesShader.set("particleData", particles.particleData.readFrom.get());	
+				
+		int vertexLocation = pgl.getAttribLocation(renderParticlesShader.glProgram, "vertex");
+		pgl.enableVertexAttribArray(vertexLocation);
+		pgl.bindBuffer(PGL.ARRAY_BUFFER, particles.particleBufferID.get(0));
+		pgl.bufferData(PGL.ARRAY_BUFFER,  particles.particleUVs.capacity(), particles.particleUVs, PGL.STATIC_DRAW);
+		pgl.vertexAttribPointer(vertexLocation, 2, PGL.FLOAT, false, 0, 0);
+		
+		renderParticlesShader.bind();
+		pgl.drawArrays(PGL.POINTS, 0, particles.count);
+		renderParticlesShader.unbind();
 	}
 	
 	private void setQuality(SimulationQuality simQ){
@@ -289,7 +310,7 @@ public class KinectFluidGenerator implements AVGenerator {
 	
 	private PVector windowToClipSpace(PVector v)
 	{	
-		return new PVector((v.x/pApp.width)*2 - 1, ((pApp.height-v.y)/pApp.height)*2 - 1);	
+		return new PVector((v.x/(float)pApp.width)*2f - 1f, (((float)pApp.height-v.y)/(float)pApp.height)*2f - 1f);	
 	}	
 }
 	

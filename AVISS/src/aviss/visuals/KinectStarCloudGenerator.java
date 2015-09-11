@@ -53,7 +53,7 @@ public class KinectStarCloudGenerator implements AVGenerator{
 	private float a = 0;
 	private int zval = 50;
 	private float pointCloudScale = 260f;
-	private float skeletonScale = 500f;
+	private float skeletonScale = 539f;
 	private float skeletonTransX, skeletonTransY, pointCloudTransX, pointCloudTransY;
 	private float audioDampening = 5f;
 	
@@ -104,15 +104,16 @@ public class KinectStarCloudGenerator implements AVGenerator{
 	}
 	
 	@Override
-	public void init(AVISSApplet applet, AudioManager am) {
+	public void init(AVISSApplet applet, AudioManager am) 
+	{
 		pApp = applet;
 		aMan = am;
 
 		osc = new OscP5(this,12000);	
 		oscEventTimer = new Timer();
 		
-		skeletonTransX = pointCloudTransX = pApp.width/2;
-		skeletonTransY = pointCloudTransY = pApp.height/2;
+		skeletonTransX = pointCloudTransX = (pApp.width/2) + 80;
+		skeletonTransY = pointCloudTransY = (pApp.height/2) + 20;
 		
 		audioIn = pApp.loadImage(getClass().getResource("/aviss/resources/starTexture.png").getPath());
 		starTexture = pApp.loadImage(getClass().getResource("/aviss/resources/green.png").getPath());
@@ -291,9 +292,9 @@ public class KinectStarCloudGenerator implements AVGenerator{
 				
 				if(h.getState() == KinectPV2.HandState_Open)
 				{
-					if(handPair.rightHandOSCReset)
-					{	
-//						System.out.println("Right OSC Triggered");
+//					if(handPair.rightHandOSCReset)
+//					{	
+//				//		System.out.println("Right OSC Triggered");
 //						if(starState.equals(StarState.Spring_React))
 //						{
 //							OscMessage clinkyTrig = new OscMessage("/startNote");
@@ -313,7 +314,7 @@ public class KinectStarCloudGenerator implements AVGenerator{
 //								  hands.get(skeletonID).rightHandOSCReset = true;
 //							  }
 //						}, 500);
-					}
+//					}
 				}				
 				if(drawSkeleton)
 					drawHandState(hLoc, h.getState());
@@ -329,8 +330,8 @@ public class KinectStarCloudGenerator implements AVGenerator{
 				
 				if(handPair.leftHandState == KinectPV2.HandState_Open)
 				{
-					if(handPair.leftHandOSCReset)
-					{
+//					if(handPair.leftHandOSCReset)
+//					{
 //						System.out.println("Left OSC Triggered");
 //						if(starState.equals(StarState.Spring_React))
 //						{
@@ -348,10 +349,10 @@ public class KinectStarCloudGenerator implements AVGenerator{
 //						oscEventTimer.schedule(new TimerTask(){
 //							  @Override
 //							  public void run() {
-//								  hands.get(skeletonID).leftHandOSCReset = true;66
+//								  hands.get(skeletonID).leftHandOSCReset = true;
 //							  }
 //						}, 500);
-					}
+//					}
 				}
 				if(drawSkeleton)
 					drawHandState(hLoc, h.getState());
@@ -434,7 +435,7 @@ public class KinectStarCloudGenerator implements AVGenerator{
 			  pgl.drawArrays(PGL.LINES, 0, (int)(kinectPointBuffer.capacity()/supernovaCoeff));
 		  }
 		  else
-			  pgl.drawArrays(PGL.POINTS, 0, kinectPointBuffer.capacity()/6);
+			  pgl.drawArrays(PGL.POINTS, 0, kinectPointBuffer.capacity());
 		 
 		  // Unbind
 		  starShader.unbind();

@@ -88,8 +88,6 @@ public class GeometryTools {
 		pgl.bindBuffer(PGL.ARRAY_BUFFER, sh.get(0));
 		pgl.bufferData(PGL.ARRAY_BUFFER, vertices.length, quad, PGL.STATIC_DRAW);
 		pgl.bindBuffer(PGL.ARRAY_BUFFER, 0);
-		PManager.endPGL();
-		pgl = null;
 		
         return sh;
     }

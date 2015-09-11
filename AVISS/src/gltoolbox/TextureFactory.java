@@ -2,6 +2,8 @@ package gltoolbox;
 
 import java.nio.IntBuffer;
 
+import com.jogamp.opengl.util.texture.TextureIO;
+
 import aviss.applet.PManager;
 import processing.opengl.PGL;
 import processing.opengl.PJOGL;

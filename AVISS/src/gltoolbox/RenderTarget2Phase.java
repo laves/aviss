@@ -113,11 +113,14 @@ public class RenderTarget2Phase implements ITargetable{
 			pgl.bindFramebuffer(PGL.FRAMEBUFFER, readFBO.get(0));
 			pgl.viewport(0, 0, width, height);
 
-			pgl.activeTexture(PGL.TEXTURE1);
 			pgl.enable(PGL.TEXTURE_2D);  
-			pgl.bindTexture(PGL.ARRAY_BUFFER, textureQuad.get(0));
+			pgl.activeTexture(PGL.TEXTURE1);
+			pgl.bindTexture(PGL.ARRAY_BUFFER, readFromTexture.get(0));
+			resampleShader.set("texture", 1);
 			
-			resampleShader.set("texture", this.readFromTexture.get(0));
+			pgl.bindBuffer(PGL.ARRAY_BUFFER, textureQuad.get(0));
+			
+//			resampleShader.set("texture", this.readFromTexture.get(0));
 			resampleShader.bind();
 			pgl.drawArrays(PGL.TRIANGLE_STRIP, 0, 4);
 			resampleShader.unbind();

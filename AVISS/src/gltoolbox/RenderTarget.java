@@ -78,7 +78,7 @@ public class RenderTarget implements ITargetable{
 
 			pgl.bindBuffer(PGL.ARRAY_BUFFER, textureQuad.get(0));
 
-			resampleShader.set("texture", texture.get(0));
+//			resampleShader.set("texture", texture.get(0));
 			resampleShader.bind();
 			pgl.drawArrays(PGL.TRIANGLE_STRIP, 0, 4);
 			resampleShader.unbind();

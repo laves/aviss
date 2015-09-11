@@ -108,10 +108,11 @@ public class ExtrusionGenerator implements AVGenerator
 	//	pApp.rotateY(velocity.y / 2);
 		//pApp.rotateZ(velocity.z / 2);
 		
-		pApp.noStroke();
+		pApp.fill(200,0,0);
 		render.drawFaces(mesh);
-		//pApp.stroke(0);
-	//	render.drawEdges(mesh);
+		pApp.stroke(0);
+		render.drawEdges(mesh);
+				
 
 		velocity.add(acceleration);
 	    location.add(velocity);

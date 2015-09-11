@@ -25,8 +25,8 @@ public class GPUFluid {
 	
 	//Render Targets
 	public RenderTarget2Phase velocityRenderTarget;
-	private RenderTarget2Phase pressureRenderTarget;
-	private RenderTarget divergenceRenderTarget;
+	public RenderTarget2Phase pressureRenderTarget;
+	public RenderTarget divergenceRenderTarget;
 	public RenderTarget2Phase dyeRenderTarget;
 	
 	//User Shaders
@@ -44,8 +44,6 @@ public class GPUFluid {
 	public GPUFluid(int width, int height, float cellSize, int solverIterations)
 	{		
 		this.aspectRatio = (float)width / (float)height;
-		textureQuad = GeometryTools.getCachedUnitQuad(PGL.TRIANGLE_STRIP);
-		
 		this.width = width;
 		this.height = height;
 		this.solverIterations = solverIterations;
@@ -67,13 +65,15 @@ public class GPUFluid {
 		fragShader = getClass().getResource("/aviss/shaders/gpufluid/update-dye.frag.glsl").getPath();
 		setUpdateDyeShader(pApp.loadShader(fragShader, vertShader));
 		
-		TextureFactory textureFactory = new TextureFactory(null, PGL.FLOAT, null, null, null, null); 		
+		textureQuad = GeometryTools.getCachedUnitQuad(PGL.TRIANGLE_STRIP);
+		
+		TextureFactory textureFactory = new TextureFactory(PGL.RGB, PGL.FLOAT, PGL.NEAREST, null, null, null); 		
 		velocityRenderTarget = new RenderTarget2Phase(width, height, textureFactory);
 		pressureRenderTarget = new RenderTarget2Phase(width, height, textureFactory);
 		divergenceRenderTarget = new RenderTarget(width, height, textureFactory);
 		
 		// may not support PGL.Linear???
-		dyeRenderTarget = new RenderTarget2Phase(width, height, new TextureFactory(PGL.RGB, PGL.FLOAT, PGL.LINEAR, null, null, null));
+		dyeRenderTarget = new RenderTarget2Phase(width, height, textureFactory);//new TextureFactory(PGL.RGB, PGL.FLOAT, PGL.LINEAR, null, null, null));
 		
 		//texel-space parameters
 		updateCoreShaderUniforms(advectShader);
@@ -110,13 +110,13 @@ public class GPUFluid {
 		
 //		System.out.println("applyForces shader drawing velocityRenderTarget...");
 		applyForces(dt);
-		
+//		
 //		System.out.println("computeDivergence");
 		computeDivergence();
-		
+//		
 //		System.out.println("solvePressure");
 		solvePressure();
-		
+//		
 //		System.out.println("subtractPressureGradient");
 		subtractPressureGradient();
 		
@@ -141,34 +141,46 @@ public class GPUFluid {
 	}
 	
 	public void clear(){
-		velocityRenderTarget.clear(null);
-		pressureRenderTarget.clear(null);
-		dyeRenderTarget.clear(null);
+		velocityRenderTarget.clear(PGL.COLOR_BUFFER_BIT);
+		pressureRenderTarget.clear(PGL.COLOR_BUFFER_BIT);
+		dyeRenderTarget.clear(PGL.COLOR_BUFFER_BIT);
 	}
 	
-	public PVector simToClipSpace(PVector sim)
+	public PVector clipToAspectSpace(PVector clip)
 	{
-		return new PVector(sim.x/(this.cellSize*this.aspectRatio), sim.y/this.cellSize);
+		return new PVector(clip.x * aspectRatio, clip.y);
 	}
+	
+//	public PVector simToClipSpace(PVector sim)
+//	{
+//		return new PVector(sim.x/(this.cellSize*this.aspectRatio), sim.y/this.cellSize);
+//	}
 	
 	public void advect(RenderTarget2Phase target, float dt)
 	{
 		PJOGL pgl = PManager.getPGL();
+	
+		advectShader.set("dt", pApp.random(1));			
 		
 		// load velocity texture
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE1);
 		pgl.bindTexture(PGL.TEXTURE_2D, velocityRenderTarget.readFromTexture.get(0)); 
-		
+		advectShader.set("velocity", 1);
+
 		// load target texture
 		pgl.activeTexture(PGL.TEXTURE2);
 		pgl.bindTexture(PGL.TEXTURE_2D, target.readFromTexture.get(0)); 
-		advectShader.set("dt", dt);	
+		advectShader.set("target", 2);
 	
+//		advectShader.set("velocity", velocityRenderTarget.readFromTexture.get(0));		
 //		advectShader.set("target", target.readFromTexture.get(0));
-//		advectShader.set("velocity", velocityRenderTarget.readFromTexture.get(0));
 		
 		renderShaderTo(advectShader, target);
+//		pgl.activeTexture(PGL.TEXTURE0);
+//		pgl.bindTexture(PGL.TEXTURE_2D, 0);
+//		pgl.activeTexture(PGL.TEXTURE1);
+//		pgl.bindTexture(PGL.TEXTURE_2D, 0); 
 		target.swap();
 	}
 	
@@ -183,9 +195,13 @@ public class GPUFluid {
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE1);
 		pgl.bindTexture(PGL.TEXTURE_2D, velocityRenderTarget.readFromTexture.get(0)); 
+		applyForcesShader.set("velocity", 1);
+		
 		applyForcesShader.set("dt", dt);
+//		applyForcesShader.set("velocity", velocityRenderTarget.readFromTexture.get(0));
 		
 		renderShaderTo(applyForcesShader, velocityRenderTarget);
+//		pgl.bindTexture(PGL.TEXTURE_2D, 0);
 		velocityRenderTarget.swap();
 	}
 	
@@ -197,8 +213,11 @@ public class GPUFluid {
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE1);
 		pgl.bindTexture(PGL.TEXTURE_2D, velocityRenderTarget.readFromTexture.get(0)); 
-
+		divergenceShader.set("velocity", 1);	
+//		divergenceShader.set("velocity", velocityRenderTarget.readFromTexture.get(0));	
+		
 		renderShaderTo(divergenceShader, divergenceRenderTarget);
+//		pgl.bindTexture(PGL.TEXTURE_2D, 0);
 	}
 	
 	private void solvePressure()
@@ -208,23 +227,33 @@ public class GPUFluid {
 		// loading divergence texture (texture2)
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE2);
-		pgl.bindTexture(PGL.TEXTURE_2D, divergenceRenderTarget.texture.get(0)); 
+		pgl.bindTexture(PGL.TEXTURE_2D, divergenceRenderTarget.texture.get(0));
+		pressureSolveShader.set("divergence", 2);	
 //		pressureSolveShader.set("divergence", divergenceRenderTarget.texture.get(0));	
-		
 		pressureSolveShader.bind();
-	
 		for(int i = 0; i < solverIterations; i++)
 		{
-			// loading pressure texture (texture1)
+			// loading pressure texture (texture1)		
+//			pgl.enable(PGL.TEXTURE_2D);
 			pgl.activeTexture(PGL.TEXTURE1);
 			pgl.bindTexture(PGL.TEXTURE_2D, pressureRenderTarget.readFromTexture.get(0)); 
+			pressureSolveShader.set("pressure", 1);
+//			pgl.activeTexture(PGL.TEXTURE1);
+//			pgl.bindTexture(PGL.TEXTURE_2D, divergenceRenderTarget.texture.get(0)); 
+//			renderShaderTo(pressureSolveShader, pressureRenderTarget);
 //			pressureSolveShader.set("pressure", pressureRenderTarget.readFromTexture.get(0));
 			
 			pressureRenderTarget.activate();
 			pgl.drawArrays(PGL.TRIANGLE_STRIP, 0, 4);
+						
 			pressureRenderTarget.swap();
 		}
 		pressureSolveShader.unbind();
+//		pgl.activeTexture(PGL.TEXTURE0);
+//		pgl.bindTexture(PGL.TEXTURE_2D, 0);
+//		pgl.activeTexture(PGL.TEXTURE1);
+//		pgl.bindTexture(PGL.TEXTURE_2D, 0); 
+
 	}
 	
 	private void subtractPressureGradient()
@@ -235,15 +264,20 @@ public class GPUFluid {
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE1);
 		pgl.bindTexture(PGL.TEXTURE_2D, pressureRenderTarget.readFromTexture.get(0)); 
-//		pressureGradientSubtractShader.set("pressure", pressureRenderTarget.readFromTexture.get(0));
+		pressureGradientSubtractShader.set("pressure", 1);
+		pressureGradientSubtractShader.set("pressure", pressureRenderTarget.readFromTexture.get(0));
 		
 		// load velocity texture
-		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE2);
 		pgl.bindTexture(PGL.TEXTURE_2D, velocityRenderTarget.readFromTexture.get(0)); 
+		pressureGradientSubtractShader.set("velocity", 2);
 //		pressureGradientSubtractShader.set("velocity", velocityRenderTarget.readFromTexture.get(0));
 		
 		renderShaderTo(pressureGradientSubtractShader, velocityRenderTarget);
+//		pgl.activeTexture(PGL.TEXTURE0);
+//		pgl.bindTexture(PGL.TEXTURE_2D, 0);
+//		pgl.activeTexture(PGL.TEXTURE1);
+//		pgl.bindTexture(PGL.TEXTURE_2D, 0); 
 		velocityRenderTarget.swap();
 	}
 	
@@ -257,11 +291,13 @@ public class GPUFluid {
 		// loading dye texture
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE1);
-		pgl.bindTexture(PGL.TEXTURE_2D, dyeRenderTarget.readFromTexture.get(0)); 
+		pgl.bindTexture(PGL.TEXTURE_2D, dyeRenderTarget.readFromTexture.get(0));
+		updateDyeShader.set("dye", 1);
 //		updateDyeShader.set("dye", dyeRenderTarget.readFromTexture.get(0));
 		updateDyeShader.set("dt", dt);
 
 		renderShaderTo(updateDyeShader, dyeRenderTarget);
+//		pgl.bindTexture(PGL.TEXTURE_2D, 0);
 		dyeRenderTarget.swap();
 	}
 	
@@ -293,7 +329,7 @@ public class GPUFluid {
 		advectShader.set("rdx", 1f/cellSize);
 		divergenceShader.set("halfrdx", 0.5f * (1f/cellSize));
 		pressureGradientSubtractShader.set("halfrdx", 0.5f * (1f/cellSize));
-		pressureSolveShader.set("alpha", -cellSize*cellSize);
+		pressureSolveShader.set("alpha", -(cellSize*cellSize));
 		return cellSize;
 	}
 	

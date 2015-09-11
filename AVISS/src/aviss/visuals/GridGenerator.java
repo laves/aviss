@@ -53,10 +53,10 @@ public class GridGenerator implements AVGenerator {
 		//pApp.rotateY(pApp.mouseX * 1.0f / pApp.width * PApplet.TWO_PI);
 		//pApp.rotateX(pApp.mouseY * 1.0f / pApp.height * PApplet.TWO_PI);
 
-		pApp.noStroke();
+		pApp.fill(200,0,0);
 		render.drawFaces(mesh);
 		pApp.stroke(0);
-	    render.drawEdges(mesh);
+		render.drawEdges(mesh);
 				
 		if(aMan.getFFTValCount() >= U){
 		float[][] vals = new float[U][V];

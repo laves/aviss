@@ -23,16 +23,28 @@ public class GraphicsExperiments implements AVGenerator{
 	private PShader advectShader;
 	private PShader screenTextureShader;
 	private PShader mouseForceShader;
-	private RenderTarget2Phase target;
-
-	private  IntBuffer textureQuad;
+	private PShader divergenceShader;
+	private PShader pressureSolveShader;
+	private PShader updateDyeShader;
+	private PShader pressureGradientSubtractShader;
+	
+	private RenderTarget2Phase velocityRenderTarget;
+	private RenderTarget2Phase pressureRenderTarget;
+	private RenderTarget divergenceRenderTarget;
+	private RenderTarget2Phase dyeRenderTarget;	
+	
+	private RenderTarget offScreenTarget;
+	
+	
+	private IntBuffer textureQuad;
+	private IntBuffer textureQuadScreen;
 	private float time;
 	private float lastTime;
 	
 	private boolean mousePointKnown = false;
 	private boolean lastMousePointKnown = false;
-	private PVector mouseClipSpace = new PVector(0, 0);
-	private PVector lastMouseClipSpace = new PVector(0, 0);
+	private PVector mouseFluid = new PVector(0, 0);
+	private PVector lastMouseFluid = new PVector(0, 0);
 	
 	@Override
 	public void init(AVISSApplet applet, AudioManager am) 
@@ -53,17 +65,54 @@ public class GraphicsExperiments implements AVGenerator{
 		mouseForceShader = pApp.loadShader(fragShader, vertShader);
 		mouseForceShader.set("dx", 32f);
 		mouseForceShader.set("velocity", 1);
+		mouseForceShader.set("mouse", mouseFluid);
+		mouseForceShader.set("lastMouse", lastMouseFluid);
+		vertShader = getClass().getResource("/aviss/shaders/gpufluid/texel-space.vert.glsl").getPath();						
+		fragShader = getClass().getResource("/aviss/shaders/gpufluid/velocity-divergence.frag.glsl").getPath();
+		divergenceShader = pApp.loadShader(fragShader, vertShader);
+		divergenceShader.set("halfrdx", 0.5f * (1f/32f));
+		divergenceShader.set("velocity", 1);
+		vertShader = getClass().getResource("/aviss/shaders/gpufluid/texel-space.vert.glsl").getPath();								
+		fragShader = getClass().getResource("/aviss/shaders/gpufluid/pressure-solve.frag.glsl").getPath();
+		pressureSolveShader = pApp.loadShader(fragShader, vertShader);
+		pressureSolveShader.set("pressure", 1);
+		pressureSolveShader.set("divergence", 2);
+		pressureSolveShader.set("alpha", -1f*(1024f));
+		vertShader = getClass().getResource("/aviss/shaders/gpufluid/texel-space.vert.glsl").getPath();										
+		fragShader = getClass().getResource("/aviss/shaders/gpufluid/pressure-gradient-subtract.frag.glsl").getPath();
+		pressureGradientSubtractShader = pApp.loadShader(fragShader, vertShader);		
+		pressureGradientSubtractShader.set("pressure", 1);
+		pressureGradientSubtractShader.set("velocity", 2);
+		pressureGradientSubtractShader.set("halfrdx", 0.5f * (1f/32f));		
+		vertShader = getClass().getResource("/aviss/shaders/gpufluid/texel-space.vert.glsl").getPath();		
+		fragShader = getClass().getResource("/aviss/shaders/gpufluid/mouseDye.frag.glsl").getPath();
+		updateDyeShader = pApp.loadShader(fragShader, vertShader);
+		updateDyeShader.set("mouse", mouseFluid);
+		updateDyeShader.set("lastMouse", lastMouseFluid);
+		updateDyeShader.set("dye", 1);
+		updateDyeShader.set("dx", 32f);
 		
-		mouseForceShader.set("mouseClipSpace", mouseClipSpace);
-		mouseForceShader.set("lastMouseClipSpace", lastMouseClipSpace);
-						
 		updateCoreShaderUniforms(advectShader);
 		updateCoreShaderUniforms(mouseForceShader);
+		updateCoreShaderUniforms(divergenceShader);
+		updateCoreShaderUniforms(pressureSolveShader);
+		updateCoreShaderUniforms(pressureGradientSubtractShader);
+		updateCoreShaderUniforms(updateDyeShader);
 		
-		PManager.getPGL();		
+		PJOGL pgl = PManager.getPGL();		
+		pgl.disable(PGL.DEPTH_TEST);
+		pgl.disable(PGL.CULL_FACE);
+		pgl.disable(PGL.DITHER);
+		
+		offScreenTarget = new RenderTarget(pApp.width, pApp.height, new TextureFactory());
 		textureQuad = GeometryTools.getCachedUnitQuad(PGL.TRIANGLE_STRIP);		
+		textureQuadScreen = GeometryTools.createQuad(0, 0, 1, 1, PGL.TRIANGLE_STRIP);
 		TextureFactory textureFactory = new TextureFactory(null, PGL.FLOAT, null, null, null, null); 				
-		target = new RenderTarget2Phase(applet.width, applet.height, textureFactory);
+		velocityRenderTarget = new RenderTarget2Phase(applet.width, applet.height, textureFactory);
+		pressureRenderTarget = new RenderTarget2Phase(applet.width, applet.width, textureFactory);		
+		divergenceRenderTarget = new RenderTarget(applet.width, applet.height, textureFactory);
+		dyeRenderTarget = new RenderTarget2Phase(applet.width, applet.height, textureFactory);//new TextureFactory(PGL.RGB, PGL.FLOAT, PGL.LINEAR, null, null, null));
+
 		PManager.endPGL();
 	}
 
@@ -76,30 +125,45 @@ public class GraphicsExperiments implements AVGenerator{
 	@Override
 	public void run() {
 		// MOUSE AND TIME**********
-		mouseClipSpace = windowToClipSpace(new PVector(pApp.mouseX, pApp.mouseY));
+		mouseFluid = clipToAspectSpace(windowToClipSpace(new PVector(pApp.mouseX, pApp.mouseY)));//windowToClipSpace(new PVector(pApp.mouseX, pApp.mouseY));
 		mousePointKnown = true;
 	
 		time = pApp.millis();
-		float dt = time - lastTime;
+		float dt = 0.016f;//time - lastTime;
 		lastTime = time;
 		
 		if(lastMousePointKnown && mousePointKnown){
 			mouseForceShader.set("isMouseDown", true);
-			mouseForceShader.set("mouseClipSpace", mouseClipSpace);
-			mouseForceShader.set("lastMouseClipSpace", lastMouseClipSpace);
+			mouseForceShader.set("mouse", mouseFluid);
+			mouseForceShader.set("lastMouse", lastMouseFluid);
+			updateDyeShader.set("isMouseDown", true);
+			updateDyeShader.set("mouse", mouseFluid);
+			updateDyeShader.set("lastMouse", lastMouseFluid);
 		}
 		//***********************
 		
 		
 		PJOGL pgl = PManager.getPGL();
+		pgl.disable(PGL.DEPTH_TEST);
+		pgl.disable(PGL.CULL_FACE);
+		pgl.disable(PGL.DITHER);
 		pgl.viewport(0, 0, pApp.width, pApp.height);
 		pgl.bindBuffer(PGL.ARRAY_BUFFER, textureQuad.get(0));
-		advect(target, dt);	
-		applyForces(dt);
+		PManager.endPGL();
 		
+//		advect(velocityRenderTarget, dt);	
+//		applyForces(dt);
+//		computeDivergence();
+//		solvePressure();
+//		subtractPressureGradient();
+		updateDye(dt);
+//		advect(dyeRenderTarget, dt);
+		
+		pgl = PManager.getPGL();
 		pgl.viewport (0, 0, pApp.width, pApp.height);
 		pgl.bindFramebuffer(PGL.FRAMEBUFFER, 0);
-		
+//		pgl.viewport (0, 0, offScreenTarget.width, offScreenTarget.height);
+//		pgl.bindFramebuffer(PGL.FRAMEBUFFER, offScreenTarget.fbo.get(0));
 		
 		pgl.clearColor(0,0,0,1);
 		pgl.clear(PGL.COLOR_BUFFER_BIT);
@@ -108,12 +172,16 @@ public class GraphicsExperiments implements AVGenerator{
 		pgl.blendFunc(PGL.SRC_ALPHA, PGL.SRC_ALPHA);
 		pgl.blendEquation(PGL.FUNC_ADD);
 		
-		renderTexture(target.readFromTexture);
-		
-		lastMouseClipSpace = windowToClipSpace(new PVector(pApp.mouseX, pApp.mouseY));
-		lastMousePointKnown = mousePointKnown;		
-		
+		renderTexture(dyeRenderTarget.readFromTexture);
 		pgl.disable(PGL.BLEND);	
+		
+//		pgl.viewport (0, 0, pApp.width, pApp.height);
+//		pgl.bindFramebuffer(PGL.FRAMEBUFFER, 0);
+//		renderTexture(offScreenTarget.texture);
+		lastMouseFluid = mouseFluid;
+		lastMousePointKnown = mousePointKnown;	
+		
+
 		PManager.endPGL();
 		pgl = null;
 	}
@@ -123,15 +191,17 @@ public class GraphicsExperiments implements AVGenerator{
 		PJOGL pgl = PManager.getPGL();
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE1);
-		pgl.bindTexture(PGL.TEXTURE_2D, target.readFromTexture.get(0)); 
-		
+		pgl.bindTexture(PGL.TEXTURE_2D, velocityRenderTarget.readFromTexture.get(0)); 
+
 		pgl.activeTexture(PGL.TEXTURE2);
 		pgl.bindTexture(PGL.TEXTURE_2D, target.readFromTexture.get(0)); 
+		
 		advectShader.set("dt", dt);	
-//		advectShader.set("velocity", target.readFromTexture.get(0));
-//		advectShader.set("target", target.readFromTexture.get(0));
+		advectShader.set("velocity", 1);
+		advectShader.set("target", 2);
 		
 		renderShaderTo(advectShader, target);
+		PManager.endPGL();
 		target.swap();
 	}
 	
@@ -143,12 +213,93 @@ public class GraphicsExperiments implements AVGenerator{
 		PJOGL pgl = PManager.getPGL();
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE1);
-		pgl.bindTexture(PGL.TEXTURE_2D, target.readFromTexture.get(0)); 
-//		mouseForceShader.set("velocity", target.readFromTexture.get(0));
+		pgl.bindTexture(PGL.TEXTURE_2D, velocityRenderTarget.readFromTexture.get(0)); 
+		mouseForceShader.set("velocity", 1);
 		mouseForceShader.set("dt", dt);
 		
-		renderShaderTo(mouseForceShader, target);
-		target.swap();
+		renderShaderTo(mouseForceShader, velocityRenderTarget);
+		PManager.endPGL();
+		velocityRenderTarget.swap();
+	}
+	
+	private void computeDivergence()
+	{
+		PJOGL pgl = PManager.getPGL();
+		
+		// load velocity texture
+		pgl.enable(PGL.TEXTURE_2D);
+		pgl.activeTexture(PGL.TEXTURE1);
+		pgl.bindTexture(PGL.TEXTURE_2D, velocityRenderTarget.readFromTexture.get(0)); 
+		
+		divergenceShader.set("velocity", 1);	
+
+		renderShaderTo(divergenceShader, divergenceRenderTarget);
+		PManager.endPGL();
+	}
+	
+	private void solvePressure()
+	{
+		PJOGL pgl = PManager.getPGL();
+		pressureSolveShader.bind();
+		
+		for(int i = 0; i < 8; i++)
+		{
+			// loading pressure texture (texture1)					
+			pgl.enable(PGL.TEXTURE_2D);
+			pgl.activeTexture(PGL.TEXTURE1);
+			pgl.bindTexture(PGL.TEXTURE_2D, pressureRenderTarget.readFromTexture.get(0)); 
+			pressureSolveShader.set("pressure", 1);
+			pgl.activeTexture(PGL.TEXTURE1);
+			pgl.bindTexture(PGL.TEXTURE_2D, divergenceRenderTarget.texture.get(0)); 
+			pressureSolveShader.set("divergence", 2);	
+//			renderShaderTo(pressureSolveShader, pressureRenderTarget);
+
+			pressureRenderTarget.activate();
+			pgl.drawArrays(PGL.TRIANGLE_STRIP, 0, 4);
+
+			pressureRenderTarget.swap();
+		}
+		pressureSolveShader.unbind();
+		PManager.endPGL();
+	}
+
+	private void subtractPressureGradient()
+	{
+		PJOGL pgl = PManager.getPGL();
+		
+		// load pressure texture
+		pgl.enable(PGL.TEXTURE_2D);
+		pgl.activeTexture(PGL.TEXTURE1);
+		pgl.bindTexture(PGL.TEXTURE_2D, pressureRenderTarget.readFromTexture.get(0)); 
+		pressureGradientSubtractShader.set("pressure", 1);
+		
+		// load velocity texture
+		pgl.activeTexture(PGL.TEXTURE2);
+		pgl.bindTexture(PGL.TEXTURE_2D, velocityRenderTarget.readFromTexture.get(0)); 
+		pressureGradientSubtractShader.set("velocity", 2);
+		
+		renderShaderTo(pressureGradientSubtractShader, velocityRenderTarget);
+		PManager.endPGL();
+		velocityRenderTarget.swap();
+	}
+	
+	private void updateDye(float dt)
+	{
+		if(updateDyeShader == null)
+			return;
+		
+		PJOGL pgl = PManager.getPGL();
+		
+		// loading dye texture
+		pgl.enable(PGL.TEXTURE_2D);
+		pgl.activeTexture(PGL.TEXTURE1);
+		pgl.bindTexture(PGL.TEXTURE_2D, dyeRenderTarget.readFromTexture.get(0));
+		updateDyeShader.set("dye", 1);
+		updateDyeShader.set("dt", dt);
+
+		renderShaderTo(updateDyeShader, dyeRenderTarget);
+		PManager.endPGL();
+		dyeRenderTarget.swap();
 	}
 	
 	private void renderShaderTo(PShader shader, ITargetable target)
@@ -163,13 +314,17 @@ public class GraphicsExperiments implements AVGenerator{
 	private void renderTexture(IntBuffer texture)
 	{
 		PJOGL pgl = PManager.getPGL();
-		pgl.bindBuffer(PGL.ARRAY_BUFFER, textureQuad.get(0));
+	
+		// activate
+		pgl.bindBuffer(PGL.ARRAY_BUFFER, textureQuadScreen.get(0));
+		
+		// texture
 		pgl.enable(PGL.TEXTURE_2D);
 		pgl.activeTexture(PGL.TEXTURE1);
 		pgl.bindTexture(PGL.TEXTURE_2D, texture.get(0)); 
-
-//		screenTextureShader.set("texture", texture.get(0));	
+		screenTextureShader.set("texture", 1);	
 		
+		// draw
 		screenTextureShader.bind();
 		pgl.drawArrays(PGL.TRIANGLE_STRIP, 0, 4);
 		screenTextureShader.unbind();
@@ -184,8 +339,10 @@ public class GraphicsExperiments implements AVGenerator{
 		shader.set("invresolution", inv);
 	}
 	
-	
-	
+	public PVector clipToAspectSpace(PVector clip)
+	{
+		return new PVector(clip.x * ((float)pApp.width / (float)pApp.height), clip.y);
+	}
 	
 	@Override
 	public void keyPressed() {

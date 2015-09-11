@@ -28,7 +28,7 @@ public class AVISSApplet extends PApplet {
 	private HashMap<String, AVGenerator> avGenMap;
 	private PeasyCam cam;
 	
-	private String vKey = "ksc";
+//	private String vKey = "ksc";
 	
 	private GImageButton settingsButton;
 	
@@ -41,31 +41,31 @@ public class AVISSApplet extends PApplet {
 	
 	public void setup() {
 		size(displayWidth, displayHeight,OPENGL);				
-		//smooth(8);
+		smooth(8);
 		noCursor();
-//		
-//		String[] settingsIcon = new String[]{				
-//				getClass().getResource("/aviss/resources/settings_24.png").getPath()
-//		};
-//		settingsButton= new GImageButton(this, width-35, height-35, settingsIcon);
+		
+		String[] settingsIcon = new String[]{				
+				getClass().getResource("/aviss/resources/settings_24.png").getPath()
+		};
+		settingsButton= new GImageButton(this, width-35, height-35, settingsIcon);
 		genLock = new ReentrantLock();
 		
-//		cam = new PeasyCam(this, 1500);
-//		cam.setMinimumDistance(0);
-//		cam.setMaximumDistance(2000);
-//		osc = new OscP5(this,12000);
-//		address = new NetAddress("142.103.165.226", 12000);
+		cam = new PeasyCam(this, 1500);
+		
+		cam.setMinimumDistance(0);
+		cam.setMaximumDistance(10000);
+//		cam.pan(200, 200);
+//		cam.lookAt(200,200,0,10000);
+		
+		osc = new OscP5(this,12000);
+		address = new NetAddress("142.103.165.226", 12000);
 		
 		PManager.setApplet(this);
-		audioManager = new AudioManager(this, 40);//, "D:/XPS/Kendrick Lamar - To Pimp a Butterfly (2015) [MP3 320 KBPS]~{VBUc}/15 i.mp3", 1024, true);
+		audioManager = new AudioManager(this, 10);//, "C:\\Users\\Ian\\Music\\test2.mp3", 1024, true);
 		new Thread(audioManager).start();
 		
 		avGenMap = new HashMap<String, AVGenerator>();		
-		//addAVGenerator(AVGeneratorType.Kinect_Star_Cloud);
-		addAVGenerator(AVGeneratorType.Kinect_Fluid);
-//		AVGenerator a = new GraphicsExperiments();
-//		a.init(this, audioManager);
-//		avGenMap.put("a", a);
+//		addAVGenerator(AVGeneratorType.Displaced_Bezier_Surface);
 	}
 
 	public void draw() 
@@ -172,7 +172,8 @@ public class AVISSApplet extends PApplet {
 		return new GridGenerator();
 	}
 	
-	private ExtrusionGenerator createExtrusion(){
+	private ExtrusionGenerator createExtrusion()
+	{
 //		HEC_Box box = new HEC_Box();
 //		box.setWidth(200);// size of grid in U direction
 //		box.setHeight(200);// size of grid in V direction
@@ -217,11 +218,11 @@ public class AVISSApplet extends PApplet {
 	
 	public void keyPressed()
 	{
-//		if (key == '6') 
+//		if (key == '5') 
 //		{
-//			vKey = "io";
+//			vKey ="io";
 //		}	
-//		else if(key == '1' || key == '2' || key == '3' || key == '4' || key == '5' || key == '7')
+//		else if(key == '1' || key == '2' || key == '3' || key == '4' || key == '6')
 //		{
 //			vKey = "ksc";
 //		}

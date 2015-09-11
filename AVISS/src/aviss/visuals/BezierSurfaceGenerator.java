@@ -75,10 +75,11 @@ public class BezierSurfaceGenerator implements AVGenerator
 		//pApp.rotateY(pApp.mouseX * 1.0f / pApp.width * PApplet.TWO_PI);
 		//pApp.rotateX(pApp.mouseY * 1.0f / pApp.height * PApplet.TWO_PI);
 
-		pApp.noStroke();
+		pApp.fill(200,0,0);
 		render.drawFaces(mesh);
 		pApp.stroke(0);
 		render.drawEdges(mesh);
+				
 		
 		for (int y = 0; y < aMan.getFFTAvgSpecSize(); y++) {
 			FFTPacket focusFreq = aMan.getFFTPackets()[y];
@@ -108,6 +109,9 @@ public class BezierSurfaceGenerator implements AVGenerator
 
 		}
 		mesh.resetFaces();
+		
+		pApp.noFill();
+		pApp.noStroke();
 	}
 
 	@Override

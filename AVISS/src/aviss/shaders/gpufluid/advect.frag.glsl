@@ -9,24 +9,28 @@ uniform float aspectRatio;
 varying vec2 texelCoord;
 varying vec2 p;
 
-vec2 simToTexelSpace(vec2 simSpace){
-    return vec2(simSpace.x / aspectRatio + 1.0 , simSpace.y + 1.0)*.5;
+vec2 aspectToTexelSpace(vec2 p){
+    return vec2(p.x / aspectRatio + 1.0 , p.y + 1.0)*.5;
 }
 
 void main(void){
   //texelCoord refers to the center of the texel! Not a corner!
-  vec2 tracedPos = p - dt * rdx * texture2D(velocity, texelCoord ).xy;
+  
+  vec2 tracedPos = p - dt * rdx * texture2D(velocity, texelCoord ).xy; //aspect space
 
-  //Bilinear Interpolation of the target field value at tracedPos 
-  tracedPos = simToTexelSpace(tracedPos)/invresolution.xy; // texel coordinates
+  //Bilinear Interpolation of the target field value at tracedPos
+  //convert from aspect space to texel space (0 -> 1 | x & y)
+  tracedPos = aspectToTexelSpace(tracedPos);
+  //convert from texel space to pixel space (0 -> w)
+  tracedPos /= invresolution.xy;
   
   vec4 st;
-  st.xy = floor(tracedPos-0.5)+0.5; //left & bottom cell centers
-  st.zw = st.xy+1.0;               //right & top centers
+  st.xy = floor(tracedPos-.5)+.5; //left & bottom cell centers
+  st.zw = st.xy+1.;               //right & top centers
 
   vec2 t = tracedPos - st.xy;
 
-  st*=invresolution.xyxy; //to unitary coords
+  st *= invresolution.xyxy; //to unitary coords
   
   vec4 tex11 = texture2D(target, st.xy );
   vec4 tex21 = texture2D(target, st.zy );

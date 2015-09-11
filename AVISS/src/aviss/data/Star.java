@@ -26,6 +26,7 @@ public class Star {
 	  public float mass;
 	  public int vIdx;
 	  public int cIdx;
+	  public int historySize;
 	  
 	  // for spring effect
 	  private float springConstant;
@@ -46,7 +47,8 @@ public class Star {
 		  Supernova
 	  }
 	  
-	  public Star(PApplet applet, KinectStarCloudGenerator kscg, FFTPacket f, int historySize, int idx) {
+	  public Star(PApplet applet, KinectStarCloudGenerator kscg, FFTPacket f, int historySize, int idx) 
+	  {
 		    pApp = applet;
 		    starCloud = kscg;
 		    vIdx = idx*3;
@@ -56,10 +58,11 @@ public class Star {
 		    velocity = new PVector(0, 0, 0);
 		    acceleration = new PVector(0, 0, 0);
 		    force = new PVector(0, 0, 0);
-		    colour = new PVector(pApp.random(0.9f), pApp.random(0.9f), pApp.random(0.9f));
+		    colour = new PVector(pApp.random(1), pApp.random(1), pApp.random(1));
 		    homeColour = colour;
 		    luminosity = pApp.random(1);
 		    homeLum = luminosity;
+		    this.historySize = historySize;
 		    
 		    springConstant = pApp.random(0.2f, 0.3f);
 		    springDampening = pApp.random(0.98f, 0.99f);
@@ -70,22 +73,26 @@ public class Star {
 
 	  public void update(LinkedHashMap<Integer, KinectHand> hands, StarState state, float audioDampening, boolean forceShow) 
 	  {
-		  float fftAvg = fftObj.getFFTAverageOverN(15);		  
+		  float fftAvg = fftObj.getFFTAverageOverN(historySize);		  
 		  float colourFactor; 
 		  if(forceShow)
 			  colourFactor = 1;
-		  else
+		  else{
 			  colourFactor = fftAvg/audioDampening;
-
+//			  colourFactor = PApplet.constrain(colourFactor, 0.2f, 1);
+		  }
+		  
+		  PVector tmpColour = new PVector();
 		  if(state.equals(StarState.Supernova))
-			    colour = new PVector(pApp.random(1), pApp.random(1), pApp.random(1));
+			  tmpColour = new PVector(pApp.random(1), pApp.random(1), pApp.random(1));
 		  else
 		  {
-			  colour.set(homeColour);
-			  colour.mult(colourFactor);
+			  tmpColour.set(homeColour);
+			  tmpColour.mult(colourFactor);
 		  }
-		  luminosity = homeLum;
-		  luminosity *= colourFactor;
+		  float tmpLuminosity = homeLum;
+		  tmpLuminosity  *= colourFactor;
+
 		  
 		  if(state.equals(StarState.Point_Cloud)|| state.equals(StarState.Supernova))
 		  {
@@ -95,10 +102,10 @@ public class Star {
 			  starCloud.kinectPointBuffer.put(vIdx+1, location.y);
 			  starCloud.kinectPointBuffer.put(vIdx+2, location.z);
 			  
-			  starCloud.colourBuffer.put(cIdx, colour.x);
-			  starCloud.colourBuffer.put(cIdx+1, colour.y);
-			  starCloud.colourBuffer.put(cIdx+2, colour.z);
-			  starCloud.colourBuffer.put(cIdx+3, luminosity);
+			  starCloud.colourBuffer.put(cIdx, tmpColour.x);
+			  starCloud.colourBuffer.put(cIdx+1, tmpColour.y);
+			  starCloud.colourBuffer.put(cIdx+2, tmpColour.z);
+			  starCloud.colourBuffer.put(cIdx+3, tmpLuminosity);
 			  return;
 		  }
 		  
@@ -115,14 +122,20 @@ public class Star {
 			  boolean reaching = false;
 			  for(KinectHand h: hands.values())
 			  { 			 
-				  PVector tmpForce;
-					if(PVector.dist(h.rightHandLocation, homeLocation) < 30 && (h.rightHandState.equals(KinectPV2.HandState_Open))){
+				    PVector tmpForce;
+					if(PVector.dist(h.rightHandLocation, homeLocation) < 50 && 
+							(!h.rightHandState.equals(KinectPV2.HandState_NotTracked)) &&
+							(!h.rightHandState.equals(KinectPV2.HandState_Unknown)))
+					{
 				    	tmpForce = PVector.sub(location, h.rightHandLocation);
 				    	tmpForce.mult(-springConstant);
 				    	force.add(tmpForce);
 				    	reaching = true;
 			    	}	    
-					if(PVector.dist(h.leftHandLocation, homeLocation) < 30 && (h.leftHandState.equals(KinectPV2.HandState_Open))){
+					if(PVector.dist(h.leftHandLocation, homeLocation) < 50 && 
+							(!h.leftHandState.equals(KinectPV2.HandState_NotTracked)) &&
+							(!h.leftHandState.equals(KinectPV2.HandState_Unknown)))
+					{
 				    	tmpForce = PVector.sub(location, h.leftHandLocation);
 				    	tmpForce.mult(-springConstant);
 				    	force.add(tmpForce);
@@ -177,10 +190,10 @@ public class Star {
 		  starCloud.kinectPointBuffer.put(vIdx+1, location.y);
 		  starCloud.kinectPointBuffer.put(vIdx+2, location.z);
 		  
-		  starCloud.colourBuffer.put(cIdx, colour.x);
-		  starCloud.colourBuffer.put(cIdx+1, colour.y);
-		  starCloud.colourBuffer.put(cIdx+2, colour.z);
-		  starCloud.colourBuffer.put(cIdx+3, luminosity);
+		  starCloud.colourBuffer.put(cIdx, tmpColour.x);
+		  starCloud.colourBuffer.put(cIdx+1, tmpColour.y);
+		  starCloud.colourBuffer.put(cIdx+2, tmpColour.z);
+		  starCloud.colourBuffer.put(cIdx+3, tmpLuminosity);
 	  }
 	  
 }
